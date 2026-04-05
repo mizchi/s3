@@ -1,11 +1,12 @@
 import {
   "mizchi/s3" @s3,
-  "moonbitlang/async",
   "moonbitlang/async/http" @http,
+  "moonbitlang/async",
   "moonbitlang/async/io" @io,
   "moonbitlang/async/js_async" @js_async,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/strconv" @strconv,
+  "moonbitlang/core/string",
 }
 
 import {
@@ -13,5 +14,13 @@ import {
 } for "test"
 
 options(
-  targets: { "js_ffi.mbt": [ "js" ], "wasm_ffi.mbt": [ "wasm", "wasm-gc" ] },
+  targets: {
+    "js_ffi.mbt": [ "js" ],
+    "operations.mbt": [ "js", "native" ],
+    "signing.mbt": [ "js", "native" ],
+    "types.mbt": [ "js", "native" ],
+    "wasm_ffi.mbt": [ "wasm", "wasm-gc" ],
+    "xml.mbt": [ "js", "native" ],
+    "xml_test.mbt": [ "js", "native" ],
+  },
 )

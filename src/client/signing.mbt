@@ -10,7 +10,7 @@ pub async fn hmac_sha256(key : Bytes, data : Bytes) -> Bytes {
 
 ///|
 fn date_stamp(date : String) -> String {
-  date.substring(end=8)
+  date[:8].to_string()
 }
 
 ///|
@@ -33,8 +33,12 @@ fn bytes_to_hex(b : Bytes) -> String {
   let hex_chars = "0123456789abcdef"
   for i in 0..<b.length() {
     let byte_val = b[i].to_int()
-    sb.write_char(hex_chars.get_char(byte_val.lsr(4).land(0xf)).unwrap())
-    sb.write_char(hex_chars.get_char(byte_val.land(0xf)).unwrap())
+    let hi = (byte_val.reinterpret_as_uint() >> 4)
+      .land(0xf)
+      .reinterpret_as_int()
+    let lo = byte_val.land(0xf)
+    sb.write_char(hex_chars.get_char(hi).unwrap())
+    sb.write_char(hex_chars.get_char(lo).unwrap())
   }
   sb.to_string()
 }
@@ -42,7 +46,7 @@ fn bytes_to_hex(b : Bytes) -> String {
 ///|
 pub async fn sign_request(
   config : S3Config,
-  method : String,
+  meth : String,
   path : String,
   query : String,
   headers : Array[(String, String)],
@@ -62,7 +66,7 @@ pub async fn sign_request(
   }
   let signed_headers = signed_header_names.join(";")
   let canonical_request = [
-    method,
+    meth,
     path,
     query,
     canonical_headers.to_string(),

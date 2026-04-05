@@ -39,7 +39,7 @@ pub fn extract_tag_values(xml : String, tag : String) -> Array[String] {
     if end_pos < 0 {
       break
     }
-    results.push(xml.substring(start=content_start, end=end_pos))
+    results.push(xml[content_start:end_pos].to_string())
     pos = end_pos + close_tag.length()
   }
   results
@@ -52,7 +52,7 @@ pub fn parse_list_objects_v2(xml : String) -> Array[S3Object] {
   let results : Array[S3Object] = []
   for i in 0..<keys.length() {
     let size : Int64 = if i < sizes.length() {
-      @strconv.parse_int64(sizes[i]) catch {
+      @string.parse_int64(sizes[i]) catch {
         _ => 0L
       }
     } else {

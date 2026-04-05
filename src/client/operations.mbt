@@ -35,7 +35,7 @@ fn extract_host(url : String) -> String {
   }
   let idx = string_index_of(s, "/", 0)
   if idx >= 0 {
-    s.substring(end=idx)
+    s[:idx].to_string()
   } else {
     s
   }
@@ -208,7 +208,7 @@ pub async fn S3Client::head_object(
     raise @s3.s3_error("S3 HEAD failed: status \{response.code}")
   }
   let size : Int64 = match response.headers.get("content-length") {
-    Some(s) => @strconv.parse_int64(s) catch { _ => 0L }
+    Some(s) => @string.parse_int64(s) catch { _ => 0L }
     None => 0L
   }
   Some({ key, size })
