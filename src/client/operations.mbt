@@ -149,6 +149,8 @@ pub async fn S3Client::delete_object(
 }
 
 ///|
+/// List objects with a given prefix (single page, up to 1000 results).
+/// Use list_all_objects for automatic pagination.
 pub async fn S3Client::list_objects(
   self : S3Client,
   prefix : String,
@@ -210,4 +212,122 @@ pub async fn S3Client::head_object(
     None => 0L
   }
   Some({ key, size })
+}
+
+///|
+/// Copy an object within the same bucket or across buckets.
+/// source_key is the key in the source bucket.
+pub async fn S3Client::copy_object(
+  self : S3Client,
+  source_bucket : String,
+  source_key : String,
+  dest_key : String,
+) -> Unit raise @s3.S3Error {
+  let payload_hash = empty_sha256
+  let extra = self.signed_headers("PUT", dest_key, "", payload_hash) catch {
+    e => raise @s3.s3_error("S3 COPY signing failed: \{e}")
+  }
+  extra["x-amz-copy-source"] = "/\{source_bucket}/\{source_key}"
+  let client = self.ensure_client()
+  let response = client.put(
+    "/\{self.config.bucket}/\{dest_key}",
+    b"",
+    extra_headers=extra,
+  ) catch {
+    e => raise @s3.s3_error("S3 COPY request failed: \{e}")
+  }
+  if response.code != 200 {
+    raise @s3.s3_error("S3 COPY failed: status \{response.code}")
+  }
+}
+
+///|
+/// Delete multiple objects in a single request.
+pub async fn S3Client::delete_objects(
+  self : S3Client,
+  keys : Array[String],
+) -> Unit raise @s3.S3Error {
+  if keys.is_empty() {
+    return
+  }
+  let xml = StringBuilder::new()
+  xml.write_string("<Delete>")
+  for key in keys {
+    xml.write_string("<Object><Key>\{key}</Key></Object>")
+  }
+  xml.write_string("</Delete>")
+  let body = @utf8.encode(xml.to_string())
+  let payload_hash = sha256_hex(body) catch {
+    e => raise @s3.s3_error("S3 DELETE_OBJECTS hash failed: \{e}")
+  }
+  let extra = self.signed_headers("POST", "", "delete=", payload_hash) catch {
+    e => raise @s3.s3_error("S3 DELETE_OBJECTS signing failed: \{e}")
+  }
+  extra["content-type"] = "application/xml"
+  let client = self.ensure_client()
+  let response = client.post(
+    "/\{self.config.bucket}?delete=",
+    body,
+    extra_headers=extra,
+  ) catch {
+    e => raise @s3.s3_error("S3 DELETE_OBJECTS request failed: \{e}")
+  }
+  if response.code != 200 {
+    raise @s3.s3_error("S3 DELETE_OBJECTS failed: status \{response.code}")
+  }
+}
+
+///|
+/// List ALL objects with a prefix, handling pagination automatically.
+/// S3 returns max 1000 objects per request.
+pub async fn S3Client::list_all_objects(
+  self : S3Client,
+  prefix : String,
+) -> Array[S3Object] raise @s3.S3Error {
+  let all : Array[S3Object] = []
+  let mut continuation_token : String? = None
+  while true {
+    let mut query = "list-type=2&prefix=\{prefix}"
+    match continuation_token {
+      Some(token) => query = query + "&continuation-token=\{token}"
+      None => ()
+    }
+    let extra = self.signed_headers("GET", "", query, empty_sha256) catch {
+      e => raise @s3.s3_error("S3 LIST signing failed: \{e}")
+    }
+    let client = self.ensure_client()
+    let response = client.get(
+      "/\{self.config.bucket}?\{query}",
+      extra_headers=extra,
+    ) catch {
+      e => raise @s3.s3_error("S3 LIST request failed: \{e}")
+    }
+    if response.code != 200 {
+      raise @s3.s3_error("S3 LIST failed: status \{response.code}")
+    }
+    let body_data = (client : &@io.Reader).read_all() catch {
+      e => raise @s3.s3_error("S3 LIST read failed: \{e}")
+    }
+    let xml_str = body_data.text() catch {
+      e => raise @s3.s3_error("S3 LIST decode failed: \{e}")
+    }
+    let objects = parse_list_objects_v2(xml_str)
+    all.append(objects)
+    let tokens = extract_tag_values(xml_str, "NextContinuationToken")
+    if tokens.is_empty() {
+      break
+    }
+    continuation_token = Some(tokens[0])
+  }
+  all
+}
+
+///|
+/// Check if an object exists. Returns true if HEAD succeeds with 200.
+pub async fn S3Client::object_exists(
+  self : S3Client,
+  key : String,
+) -> Bool raise @s3.S3Error {
+  let result = self.head_object(key)
+  result is Some(_)
 }
