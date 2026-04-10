@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "repository": "https://github.com/mizchi/s3",
   "deps": {
-    "moonbitlang/async": "0.17.0"
+    "moonbitlang/async": "0.17.0",
+    "mizchi/x": "0.2.0"
   }
 }
